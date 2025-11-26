@@ -207,17 +207,13 @@ export default class ModuleCard {
             customButtons: isMaintenanceMode ? [] : [maintenanceLink],
           },
 
-          () => self.dispatchPreEvent('update', this)
-            && self.confirmAction('update', this)
-            && self.requestToController('update', $(this)),
+          () => self.upgradeAction(this)
         );
 
         updateConfirmModal.show();
       } else {
         return (
-          self.dispatchPreEvent('update', this)
-          && self.confirmAction('update', this)
-          && self.requestToController('update', $(this))
+          self.upgradeAction(this)
         );
       }
 
@@ -343,7 +339,6 @@ export default class ModuleCard {
     if (forceDeletion === 'true' || forceDeletion === true) {
       actionParams.push({name: 'actionParams[deletion]', value: 'true'});
     }
-
     $.ajax({
       url,
       dataType: 'json',
@@ -375,10 +370,12 @@ export default class ModuleCard {
           return;
         }
 
-        $.growl({
-          message: result[moduleTechName].msg,
-          duration: 6000,
-        });
+        if(action !== 'upload'){
+          $.growl({
+            message: result[moduleTechName].msg,
+            duration: 6000,
+          });
+        }
 
         if (result[moduleTechName].refresh_needed === true) {
           refreshNeeded = true;
@@ -426,11 +423,13 @@ export default class ModuleCard {
           this.eventEmitter.emit('Module Upgraded', mainElement);
         }
 
-        // Since we replace the DOM content
-        // we need to update the jquery object reference to target the new content,
-        // and we need to hide the new content which is not hidden by default
-        jqElementObj = $(result[moduleTechName].action_menu_html).replaceAll(jqElementObj);
-        jqElementObj.hide();
+        if(action !== 'upload'){
+          // Since we replace the DOM content
+          // we need to update the jquery object reference to target the new content,
+          // and we need to hide the new content which is not hidden by default
+          jqElementObj = $(result[moduleTechName].action_menu_html).replaceAll(jqElementObj);
+          jqElementObj.hide();
+        }
       })
       .fail(() => {
         const moduleItem = jqElementObj.closest('module-item-list');
@@ -455,5 +454,34 @@ export default class ModuleCard {
       });
 
     return false;
+  }
+
+  async upgradeAction(element: string, callback = () => true): Promise<boolean> {
+    this.dispatchPreEvent('update', element);
+    this.confirmAction('update', element);
+
+    const form = $(element).closest('form');
+
+    if( form.attr('action') ){
+      //We get the action url
+      const upgradeUrl = form.attr('action') || '';
+      const uploadUrl = upgradeUrl.replace('/upgrade/', '/upload/') || '';
+
+      try {
+        //We replace the action with the upload action
+        form.attr('action', uploadUrl);
+        await this.requestToController('upload', $(element), false, (): boolean => {
+          const url = new URL(upgradeUrl.toString(), window.location.origin);
+          url.searchParams.delete('source');
+          form.attr('action', url.toString().replace(window.location.origin, ''));
+          return this.requestToController('upgrade', $(element), false, callback);
+        });
+        
+      } catch (error) {
+        console.error('Error making request', error);
+      }
+    }
+    
+    return Promise.resolve(true);
   }
 }

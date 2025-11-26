@@ -72,7 +72,7 @@ class ModuleManager implements ModuleManagerInterface
         $this->filesystem = new Filesystem();
     }
 
-    public function upload(string $source): string
+    public function upload(string $source): bool
     {
         if (!$this->adminModuleDataProvider->isAllowedAccess(__FUNCTION__)) {
             throw new Exception($this->translator->trans(
@@ -88,7 +88,7 @@ class ModuleManager implements ModuleManagerInterface
         $module = $this->moduleRepository->getModule($moduleName);
         $this->dispatch(ModuleManagementEvent::UPLOAD, $module);
 
-        return $moduleName;
+        return true;
     }
 
     public function install(string $name, $source = null): bool

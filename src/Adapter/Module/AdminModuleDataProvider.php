@@ -54,6 +54,7 @@ class AdminModuleDataProvider implements ModuleInterface
         Module::ACTION_DISABLE => 'Disable',
         Module::ACTION_RESET => 'Reset',
         Module::ACTION_UPGRADE => 'Update',
+        Module::ACTION_UPLOAD => 'Upload',
         Module::ACTION_CONFIGURE => 'Configure',
         Module::ACTION_DELETE => 'Delete',
     ];
@@ -68,6 +69,7 @@ class AdminModuleDataProvider implements ModuleInterface
         Module::ACTION_DISABLE,
         Module::ACTION_RESET,
         Module::ACTION_UPGRADE,
+        Module::ACTION_UPLOAD,
         Module::ACTION_UNINSTALL,
         Module::ACTION_DELETE,
     ];
@@ -219,6 +221,9 @@ class AdminModuleDataProvider implements ModuleInterface
             }
 
             // Let's filter the actions depending on conditions the module is in
+            // Hide upload action
+            unset($urls['upload']);
+            
             if ($module->isInstalled()) {
                 unset($urls['install']);
                 unset($urls['delete']);
