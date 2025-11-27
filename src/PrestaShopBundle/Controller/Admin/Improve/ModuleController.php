@@ -256,7 +256,7 @@ class ModuleController extends ModuleAbstractController
                 $response[$moduleName]['has_download_url'] = $moduleInstance->attributes->has('download_url');
             }
             if ($action === ModuleAdapter::ACTION_UPLOAD) {
-                $response[$moduleName]['status'] = call_user_func([$moduleManager, $action], ...[$source]);
+                $response[$moduleName]['status'] = (bool) call_user_func([$moduleManager, $action], ...[$source]);
                 $response[$moduleName]['refresh_needed'] = false;
             }else $response[$moduleName]['status'] = call_user_func([$moduleManager, $action], ...$args);
         } catch (Exception $e) {

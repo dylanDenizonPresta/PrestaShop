@@ -207,14 +207,16 @@ export default class ModuleCard {
             customButtons: isMaintenanceMode ? [] : [maintenanceLink],
           },
 
-          () => self.upgradeAction(this)
+          () => self.dispatchPreEvent('update', this)
+          && self.confirmAction('update', this)
+          && self.upgradeWithUploadFallback(this)
         );
 
         updateConfirmModal.show();
       } else {
-        return (
-          self.upgradeAction(this)
-        );
+        return self.dispatchPreEvent('update', this)
+          && self.confirmAction('update', this)
+          && self.upgradeWithUploadFallback(this);
       }
 
       return false;
@@ -316,7 +318,7 @@ export default class ModuleCard {
     action: string,
     element: JQuery,
     forceDeletion: string | boolean = false,
-    callback = () => true,
+    callback = (response: any) => true,
   ): boolean {
     if (this.pendingRequest) {
       $.growl.warning({
@@ -370,13 +372,6 @@ export default class ModuleCard {
           return;
         }
 
-        if(action !== 'upload'){
-          $.growl({
-            message: result[moduleTechName].msg,
-            duration: 6000,
-          });
-        }
-
         if (result[moduleTechName].refresh_needed === true) {
           refreshNeeded = true;
           return;
@@ -423,7 +418,12 @@ export default class ModuleCard {
           this.eventEmitter.emit('Module Upgraded', mainElement);
         }
 
-        if(action !== 'upload'){
+        if(action !== 'upload') {
+          $.growl({
+            message: result[moduleTechName].msg,
+            duration: 6000,
+          });
+
           // Since we replace the DOM content
           // we need to update the jquery object reference to target the new content,
           // and we need to hide the new content which is not hidden by default
@@ -439,7 +439,7 @@ export default class ModuleCard {
           fixed: true,
         });
       })
-      .always(() => {
+      .always((response) => {
         if (refreshNeeded) {
           document.location.reload();
           return;
@@ -449,39 +449,50 @@ export default class ModuleCard {
         this.pendingRequest = false;
 
         if (callback) {
-          callback();
+          callback(Object.values(response)[0]);
         }
       });
 
     return false;
   }
 
-  async upgradeAction(element: string, callback = () => true): Promise<boolean> {
-    this.dispatchPreEvent('update', element);
-    this.confirmAction('update', element);
 
+  private buildUploadUrlFromUpgrade(upgradeUrl: string): string {
+    return upgradeUrl.replace('/upgrade/', '/upload/');
+  }
+
+  private restoreUpgradeAction(form: JQuery, upgradeUrl: string, removeSource = true): void {
+    const sanitizedUrl = new URL(upgradeUrl.toString(), window.location.origin);
+    if (removeSource) {
+      sanitizedUrl.searchParams.delete('source');
+    }
+    form.attr('action', sanitizedUrl.toString().replace(window.location.origin, ''));
+  }
+
+  upgradeWithUploadFallback(element: string, callback = () => true): boolean {
     const form = $(element).closest('form');
 
-    if( form.attr('action') ){
-      //We get the action url
+    if (form.attr('action')) {
+      // Temporarily override the action to trigger the upload before the upgrade
       const upgradeUrl = form.attr('action') || '';
-      const uploadUrl = upgradeUrl.replace('/upgrade/', '/upload/') || '';
+      const uploadUrl = this.buildUploadUrlFromUpgrade(upgradeUrl);
+      // Temporarily replace the action with the upload action
+      form.attr('action', uploadUrl);
 
       try {
-        //We replace the action with the upload action
-        form.attr('action', uploadUrl);
-        await this.requestToController('upload', $(element), false, (): boolean => {
-          const url = new URL(upgradeUrl.toString(), window.location.origin);
-          url.searchParams.delete('source');
-          form.attr('action', url.toString().replace(window.location.origin, ''));
-          return this.requestToController('upgrade', $(element), false, callback);
+        return this.requestToController('upload', $(element), false, (response): boolean => {
+          if (response.status === true) {
+            this.restoreUpgradeAction(form, upgradeUrl);
+            return this.requestToController('upgrade', $(element), false, callback);
+          }
+          return false;
         });
-        
       } catch (error) {
         console.error('Error making request', error);
+        this.restoreUpgradeAction(form, upgradeUrl, false);
+        return false;
       }
     }
-    
-    return Promise.resolve(true);
+    return false;
   }
 }

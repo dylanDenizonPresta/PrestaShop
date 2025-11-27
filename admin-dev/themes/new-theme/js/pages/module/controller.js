@@ -822,14 +822,11 @@ class AdminModuleController {
           unstackModulesActions,
         );
       } else {
-        console.log('coucou je suis ici');
         self.moduleCardController.upgradeAction(actionMenuLink, unstackModulesActions);
       }
     }
 
     function unstackModulesActions() {
-      console.log('coucou je suis ici 2');
-      console.log('actionMenuLinks', actionMenuLinks);
       if (actionMenuLinks.length <= 0) {
         return;
       }
